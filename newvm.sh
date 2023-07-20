@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
-vmname="dev-$(date +%b%y | tr '[:upper:]' '[:lower:]')"
-vms=$(multipass list --format json | jq '.list[].name')
+if [ -z "$1" ]
+then
+  echo "No VM name provided. Usage: $0 <vmname>"
+  exit 1
+fi
+vmname=$1
+vms=$(limactl list --json | jq --slurp '.[] | .name')
 
 echo "Current VMs: $(echo $vms | tr '\n' ' ')"
 
@@ -9,16 +14,16 @@ if echo $vms | grep -q "$vmname" ; then
 else
     echo "Creating new VM with name $vmname"
 
-    multipass launch -n $vmname -m 8G -d 100G -c 4 --timeout 600 --cloud-init scott-agent-dev-cloud-config.yaml jammy
+    limactl start --name $vmname --tty=false ./lima.yaml
 
     echo "Created VM"
 fi
 
-ip=$(multipass list --format json | jq -e --arg vmname $vmname '.list[] | select(.name == $vmname) | .ipv4[] | select(. | startswith("192"))')
+port=$(limactl list --json | jq --slurp --arg vmname $vmname '.[] | select(.name==$vmname) | .sshLocalPort')
 
 if [ $? -eq 0 ] ; then
-    echo "Found VM in 'multipass list' - here's an SSH config"
-    echo -e "Host $vmname\n    HostName $ip\n    User ubuntu\n    ForwardAgent yes"
+    echo "Found VM in 'limactl list' - here's an SSH config"
+    echo -e "Host $vmname\n    HostName localhost\n    User lima\n    ForwardAgent yes\n    Port $port"
 else
     echo "Could not find vm and/or its IP, did it work?"
 fi
