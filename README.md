@@ -12,6 +12,8 @@ ssh keys inside my VM.
 This is my main pain point currently, the SSH port used changes every
 time the VM restarts, so I have to manually update my `~/.ssh/config`.
 
+> TODO -- this can be fixed https://github.com/lima-vm/lima/discussions/810
+
 See `newvm.sh` for a simple script to create a VM and get the SSH config.
 
 See `lima.yaml` for some setup scripts that installs dependencies and sets up
