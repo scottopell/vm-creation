@@ -16,3 +16,11 @@ See `newvm.sh` for a simple script to create a VM and get the SSH config.
 
 See `lima.yaml` for some setup scripts that installs dependencies and sets up
 my dotfiles etc.
+
+`setup.sh` has a shell script version of setup for a debian/ubuntu
+
+todo:
+- set `kernel.perf_event_paranoid` https://superuser.com/a/980757
+-
+
+

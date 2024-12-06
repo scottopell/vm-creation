@@ -1,16 +1,46 @@
-# Requires Lima v0.7.0 or later.
+minimumLimaVersion: "1.0.0"
+
+# BEGIN: Copy from https://github.com/lima-vm/lima/blob/master/templates/ubuntu-24.10.yaml
 images:
-- location: "https://cloud-images.ubuntu.com/releases/22.04/release-20220712/ubuntu-22.04-server-cloudimg-amd64.img"
+# Try to use release-yyyyMMdd image if available. Note that release-yyyyMMdd will be removed after several months.
+- location: "https://cloud-images.ubuntu.com/releases/24.10/release-20241109/ubuntu-24.10-server-cloudimg-amd64.img"
   arch: "x86_64"
-  digest: "sha256:86481acb9dbd62e3e93b49eb19a40c66c8aa07f07eff10af20ddf355a317e29f"
-- location: "https://cloud-images.ubuntu.com/releases/22.04/release-20220712/ubuntu-22.04-server-cloudimg-arm64.img"
+  digest: "sha256:05bbfe57d7701c685d8c65f4d34cebe947bc89e3509c4d8a2b9c77f39e91f3ca"
+- location: "https://cloud-images.ubuntu.com/releases/24.10/release-20241109/ubuntu-24.10-server-cloudimg-arm64.img"
   arch: "aarch64"
-  digest: "sha256:e1ce033239f0038dca5ef09e582762ba0d0dfdedc1d329bc51bb0e9f5057af9d"
+  digest: "sha256:0f1d5b8318342201e4200f592ff46c23ce29d486025b5b12b2036a6a009c93d8"
+- location: "https://cloud-images.ubuntu.com/releases/24.10/release-20241109/ubuntu-24.10-server-cloudimg-riscv64.img"
+  arch: "riscv64"
+  digest: "sha256:d00a2b4294eed3eb687f49b11126e0e03c20110f5c8badb684316dc081f068d5"
+- location: "https://cloud-images.ubuntu.com/releases/24.10/release-20241109/ubuntu-24.10-server-cloudimg-armhf.img"
+  arch: "armv7l"
+  digest: "sha256:b384416ef2ec92546f80e65bf1a0d33da1e6e6a17a8a6b0dde0d3ce170209148"
 # Fallback to the latest release image.
-- location: "https://cloud-images.ubuntu.com/releases/22.04/release/ubuntu-22.04-server-cloudimg-amd64.img"
+# Hint: run `limactl prune` to invalidate the cache
+- location: "https://cloud-images.ubuntu.com/releases/24.10/release/ubuntu-24.10-server-cloudimg-amd64.img"
   arch: "x86_64"
-- location: "https://cloud-images.ubuntu.com/releases/22.04/release/ubuntu-22.04-server-cloudimg-arm64.img"
+- location: "https://cloud-images.ubuntu.com/releases/24.10/release/ubuntu-24.10-server-cloudimg-arm64.img"
   arch: "aarch64"
+- location: "https://cloud-images.ubuntu.com/releases/24.10/release/ubuntu-24.10-server-cloudimg-riscv64.img"
+  arch: "riscv64"
+- location: "https://cloud-images.ubuntu.com/releases/24.10/release/ubuntu-24.10-server-cloudimg-armhf.img"
+  arch: "armv7l"
+
+# 9p is broken in Linux v6.9, v6.10, and v6.11 (used by Ubuntu 24.10).
+# The issue was fixed in Linux v6.12-rc5 (https://github.com/torvalds/linux/commit/be2ca38).
+mountTypesUnsupported: ["9p"]
+
+# END
+
+
+# CPUs
+cpus: 8
+
+# Memory size
+memory: 24GiB
+
+ssh:
+  localPort: 62222
 
 mounts:
 - location: "~"
@@ -19,120 +49,199 @@ mounts:
 - location: "/tmp/lima"
   writable: true
 
+# Provisioning scripts need to be idempotent because they might be called
+# multiple times, e.g. when the host VM is being restarted.
+# The scripts can use the following template variables: {{.Home}}, {{.Name}}, {{.Hostname}}, {{.UID}}, {{.User}}, and {{.Param.Key}}.
 provision:
-# `system` is executed with the root privilege
-- mode: system
-  script: |
-    #!/bin/bash
-    # Generic system setup, installing devtools and libraries
-    set -eux -o pipefail
-    export DEBIAN_FRONTEND=noninteractive
-    add-apt-repository ppa:git-core/ppa -y
-    add-apt-repository ppa:neovim-ppa/stable -y
-    add-apt-repository ppa:longsleep/golang-backports -y
+  # System-level provisioning script
+  - mode: system
+    script: |
+      #!/bin/bash
+      # Generic system setup, installing devtools and libraries
+      set -eux -o pipefail
+      export DEBIAN_FRONTEND=noninteractive
 
-    apt update
-    apt upgrade -y
+      for ppa in "git-core/ppa" "longsleep/golang-backports"; do
+        add-apt-repository "ppa:${ppa}" -y --no-update
+      done
 
-    apt install -y apt-transport-https \
-      binfmt-support \
-      bundler \
-      ca-certificates \
-      cmake \
-      curl \
-      dpkg-dev \
-      g++ \
-      golang-go \
-      gcc \
-      git \
-      gnupg \
-      htop \
-      jq \
-      libpq-dev \
-      libsasl2-dev \
-      libsnmp-base \
-      libsnmp-dev \
-      libssl-dev \
-      libsystemd-dev \
-      neovim \
-      make \
-      pkg-config \
-      protobuf-compiler \
-      python3-dev \
-      python3-distutils \
-      python3-pip \
-      python3-setuptools \
-      pv \
-      qemu-user-static \
-      snmp \
-      snmpd \
-      socat \
-      tar \
-      tmux \
-      tree \
-      wget \
-      zsh \
+      apt-get update
+      apt-get upgrade -y
 
-    apt-get autoremove -y
+      apt-get install -y apt-transport-https \
+        binfmt-support \
+        bundler \
+        ca-certificates \
+        cmake \
+        curl \
+        dpkg-dev \
+        g++ \
+        golang-go \
+        gcc \
+        git \
+        htop \
+        jq \
+        libssl-dev \
+        libsystemd-dev \
+        neovim \
+        make \
+        pkg-config \
+        protobuf-compiler \
+        python3-dev \
+        python3-pip \
+        python3-setuptools \
+        pv \
+        socat \
+        tar \
+        tmux \
+        tree \
+        wget \
+        zsh
 
-    # Disable un-necessary services
-    systemctl disable man-db.timer man-db.service --now
-    systemctl disable apport.service apport-autoreport.service  --now
-    systemctl disable apt-daily.service apt-daily.timer --now
-    systemctl disable apt-daily-upgrade.service apt-daily-upgrade.timer --now
-    systemctl disable unattended-upgrades.service --now
-    systemctl disable motd-news.service motd-news.timer --now
-    systemctl disable bluetooth.target --now
+      apt-get autoremove -y
 
-    # Set ZSH as default for default user 'lima'
-    chsh -s $(which zsh) lima
+      # Disable unnecessary services
+      systemctl disable --now man-db.timer man-db.service || true
+      systemctl disable --now apport.service apport-autoreport.service || true
+      systemctl disable --now apt-daily.service apt-daily.timer || true
+      systemctl disable --now apt-daily-upgrade.service apt-daily-upgrade.timer || true
+      systemctl disable --now unattended-upgrades.service || true
+      systemctl disable --now motd-news.service motd-news.timer || true
+      systemctl disable --now bluetooth.target || true
 
-- mode: system
-  script: |
-    #!/bin/bash
-    # Datadog
-    set -eux -o pipefail
+      # Set ZSH as default for default user '{{.User}}' if not already set
+      current_shell=$(getent passwd {{.User}} | cut -d: -f7)
+      if [ "$current_shell" != "$(which zsh)" ]; then
+        chsh -s "$(which zsh)" {{.User}}
+      fi
+      # Add '{{.User}}' to 'systemd-journal' and 'adm' groups for log access
+      if ! id -nG "{{.User}}" | grep -qw "systemd-journal"; then
+        usermod -aG systemd-journal "{{.User}}"
+      fi
+      if ! id -nG "{{.User}}" | grep -qw "adm"; then
+        usermod -aG adm "{{.User}}"
+      fi
 
-    mkdir -p /var/log/datadog/ /opt/datadog-agent/run/
-    chmod 777 /var/log/datadog/
+  # Datadog setup
+  - mode: system
+    script: |
+      #!/bin/bash
+      # Datadog setup
+      set -eux -o pipefail
 
-- mode: user
-  script: |
-    #!/bin/bash
-    set -eux -o pipefail
-    pip install --upgrade pip
+      mkdir -p /var/log/datadog/ /opt/datadog-agent/run/
+      chmod 777 /var/log/datadog/
 
-    curl https://sh.rustup.rs -sSf | sh -s -- -y
-    source "$HOME/.cargo/env"
+  # bpftrace setup
+  - mode: system
+    script: |
+      #!/bin/bash
+      # Set up bpftrace
+      set -eux -o pipefail
 
-    rustup component add rust-analyzer
-    ln -s $(rustup which --toolchain stable rust-analyzer) $HOME/.cargo/bin/rust-analyzer
-    cargo install --locked ripgrep fd-find bat hwatch
+      export DEBIAN_FRONTEND=noninteractive
 
+      # Install bpftrace if not already installed
+      if ! dpkg -s bpftrace >/dev/null 2>&1; then
+        apt-get update && apt-get install -y bpftrace
+      fi
 
-- mode: user
-  script: |
-    #!/bin/bash
-    set -eux -o pipefail
-    cat <<EOF > ~/setupDotfiles.sh
-    git clone https://github.com/scottopell/dotfiles.git $HOME/dotfiles
-    mkdir -p $HOME/.config/tmux $HOME/.config/nvim $HOME/.config/git
-    ln -s $HOME/dotfiles/tmux.conf $HOME/.config/tmux/tmux.conf
-    ln -s $HOME/dotfiles/init.vim $HOME/.config/nvim/init.vim
-    ln -s $HOME/dotfiles/gitignore_global $HOME/.config/git/gitignore_global
-    ln -s $HOME/dotfiles/gitconfig $HOME/.config/git/config
-    ln -s $HOME/dotfiles/shell_aliases $HOME/.shell_aliases
-    ln -s $HOME/dotfiles/p10k.zsh $HOME/.p10k.zsh
-    sh -c 'curl -fLo "${XDG_DATA_HOME:-$HOME/.local/share}"/nvim/site/autoload/plug.vim --create-dirs \
-     https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim'
-    nvim +PlugInstall +qall
-    nvim +GoInstallBinaries +qall
-    git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ~/powerlevel10k
+      # Add debug symbol repositories if not already added
+      if [ ! -f /etc/apt/sources.list.d/ddebs.list ]; then
+        cat <<EOF > /etc/apt/sources.list.d/ddebs.list
+      deb http://ddebs.ubuntu.com $(lsb_release -cs) main restricted universe multiverse
+      deb http://ddebs.ubuntu.com $(lsb_release -cs)-updates main restricted universe multiverse
+      deb http://ddebs.ubuntu.com $(lsb_release -cs)-proposed main restricted universe multiverse
+      EOF
+        apt-get install -y ubuntu-dbgsym-keyring
+        apt-get update
+      fi
 
-    echo 'source ~/dotfiles/zshrc' >> ~/.zshrc
-    echo 'source ~/powerlevel10k/powerlevel10k.zsh-theme' >>~/.zshrc
-    echo 'PATH=$PATH:$HOME/.local/bin' >> ~/.zshrc
+  # Rust and Cargo tools setup
+  - mode: user
+    script: |
+      #!/bin/bash
+      set -eux -o pipefail
 
-    EOF
-    chmod +x ~/setupDotfiles.sh
+      # Upgrade pip
+      python3 -m pip install --user --upgrade pip --break-system-packages
+
+      # Install Rustup if not already installed
+      if [ ! -f "$HOME/.cargo/bin/rustup" ]; then
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+      fi
+      source "$HOME/.cargo/env"
+
+      # Add rust-analyzer component if not already added
+      if ! rustup component list --installed | grep -q rust-analyzer; then
+        rustup component add rust-analyzer
+      fi
+
+      # Create symlink for rust-analyzer
+      ln -sf "$(rustup which --toolchain stable rust-analyzer)" "$HOME/.cargo/bin/rust-analyzer"
+
+      # Install cargo-binstall if not already installed
+      if ! command -v cargo-binstall >/dev/null 2>&1; then
+        cargo install --locked cargo-binstall
+      fi
+
+      # Install tools using cargo-binstall
+      cargo binstall --no-confirm ripgrep fd-find bat hwatch
+
+  # Add the setupDotfiles.sh script to the VM
+  - mode: user
+    script: |
+      #!/bin/bash
+      set -eux -o pipefail
+
+      # Write the setupDotfiles.sh script to the home directory
+      cat << 'EOF' > "$HOME/setupDotfiles.sh"
+      #!/bin/bash
+      set -eux -o pipefail
+
+      # Only run the setup if it hasn't been run before
+      if [ ! -f "$HOME/.setup_dotfiles_done" ]; then
+        # Clone or update dotfiles repository
+        if [ -d "$HOME/dotfiles/.git" ]; then
+          git -C "$HOME/dotfiles" pull
+        else
+          git clone https://github.com/scottopell/dotfiles.git "$HOME/dotfiles"
+        fi
+
+        # Create configuration directories
+        mkdir -p "$HOME/.config/tmux" "$HOME/.config/nvim" "$HOME/.config/git"
+
+        # Create or overwrite symbolic links
+        ln -sf "$HOME/dotfiles/tmux.conf" "$HOME/.config/tmux/tmux.conf"
+        ln -sf "$HOME/dotfiles/init.vim" "$HOME/.config/nvim/init.vim"
+        ln -sf "$HOME/dotfiles/gitignore_global" "$HOME/.config/git/gitignore_global"
+        ln -sf "$HOME/dotfiles/gitconfig" "$HOME/.config/git/config"
+        ln -sf "$HOME/dotfiles/shell_aliases" "$HOME/.shell_aliases"
+        ln -sf "$HOME/dotfiles/p10k.zsh" "$HOME/.p10k.zsh"
+
+        # Install vim-plug for Neovim
+        if [ ! -f "${XDG_DATA_HOME:-$HOME/.local/share}/nvim/site/autoload/plug.vim" ]; then
+          curl -fLo "${XDG_DATA_HOME:-$HOME/.local/share}/nvim/site/autoload/plug.vim" --create-dirs \
+            https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+        fi
+
+        # Install Neovim plugins
+        nvim +PlugInstall +qall
+
+        # Install Go binaries for Neovim
+        nvim +GoInstallBinaries +qall
+
+        git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ~/powerlevel10k
+
+        # Update .zshrc if entries are not already present
+        grep -qxF 'source ~/dotfiles/zshrc' ~/.zshrc || echo 'source ~/dotfiles/zshrc' >> ~/.zshrc
+        grep -qxF 'source ~/powerlevel10k/powerlevel10k.zsh-theme' ~/.zshrc || echo 'source ~/powerlevel10k/powerlevel10k.zsh-theme' >> ~/.zshrc
+        grep -qxF 'PATH=$PATH:$HOME/.local/bin' ~/.zshrc || echo 'PATH=$PATH:$HOME/.local/bin' >> ~/.zshrc
+
+        touch "$HOME/.setup_dotfiles_done"
+      fi
+      EOF
+
+      # Make the script executable
+      chmod +x "$HOME/setupDotfiles.sh"
 
